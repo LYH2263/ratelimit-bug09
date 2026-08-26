@@ -80,7 +80,11 @@ func (l *Limiter) AllowCtx(ctx context.Context, key string) (bool, error) {
 	if !ok {
 		return false, fmt.Errorf("%w: key %q", ErrExhausted, key)
 	}
+	// 令牌已扣。此时若 ctx 已取消（网关超时、客户端断开、请求被取消），
+	// 该放行无效，必须把刚扣的令牌归还，否则取消的请求会空耗桶，
+	// 后续合法请求被误限。
 	if err := ctx.Err(); err != nil {
+		l.credit(key, 1)
 		return false, err
 	}
 	return true, nil
